@@ -26,7 +26,7 @@ config:
   trustServerCertificate: true
 
 secrets:
-  saPassword: "YourStrong!Passw0rd"
+  saPassword: "Password"
   jwtKey: "CHANGE_ME_TO_LONG_RANDOM_STRING"
 
 redis:
