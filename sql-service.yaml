@@ -1,0 +1,15 @@
+{{- if .Values.sql.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: smartops-sql
+  {{- if .Release.Namespace }}
+  namespace: {{ .Release.Namespace }}
+  {{- end }}
+spec:
+  selector:
+    app: smartops-sql
+  ports:
+    - port: {{ .Values.sql.port }}
+      targetPort: {{ .Values.sql.port }}
+{{- end }}

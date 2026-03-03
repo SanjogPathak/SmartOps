@@ -1,0 +1,18 @@
+{{- if and .Values.sql.enabled .Values.sql.storage.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: smartops-sql-pvc
+  {{- if .Release.Namespace }}
+  namespace: {{ .Release.Namespace }}
+  {{- end }}
+spec:
+  accessModes:
+  {{- toYaml .Values.sql.storage.accessModes | nindent 2 }}
+  resources:
+    requests:
+      storage: {{ .Values.sql.storage.size }}
+  {{- if .Values.sql.storage.storageClassName }}
+  storageClassName: {{ .Values.sql.storage.storageClassName | quote }}
+  {{- end }}
+{{- end }}

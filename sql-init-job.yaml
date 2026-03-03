@@ -1,0 +1,23 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: smartops-sql-init
+  namespace: smartops
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: init
+          image: mcr.microsoft.com/mssql-tools
+          env:
+            - name: SA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: smartops-secrets
+                  key: SA_PASSWORD
+          command:
+            - /bin/sh
+            - -c
+            - |
+              /opt/mssql-tools/bin/sqlcmd -S smartops-sql -U sa -P "$SA_PASSWORD" -Q "IF DB_ID('SmartOpsDb') IS NULL CREATE DATABASE SmartOpsDb;"

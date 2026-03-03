@@ -1,0 +1,73 @@
+trigger:
+- main
+
+variables:
+  ACR_NAME: smartopsacr
+  ACR_LOGIN_SERVER: smartopsacr.azurecr.io
+  IMAGE_REPO: smartops-api
+
+  AKS_RG: rg-smartops
+  AKS_NAME: smartops-aks
+  K8S_NAMESPACE: smartops
+
+  HELM_CHART_PATH: helm/smartops
+  DOCKERFILE_PATH: SmartOpsAI/src/SmartOps.API/Dockerfile
+  BUILD_CONTEXT: .
+
+stages:
+
+- stage: Build
+  displayName: Build and Push Image
+  jobs:
+  - job: BuildPush
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+    - checkout: self
+
+    - task: AzureCLI@2
+      displayName: Login to ACR
+      inputs:
+        azureSubscription: SmartOps-ServiceConnection
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          az acr login -n $(ACR_NAME)
+
+    - script: |
+        docker build -f $(DOCKERFILE_PATH) -t $(ACR_LOGIN_SERVER)/$(IMAGE_REPO):$(Build.BuildId) $(BUILD_CONTEXT)
+
+        docker push $(ACR_LOGIN_SERVER)/$(IMAGE_REPO):$(Build.BuildId)
+      displayName: Build and Push Docker image
+
+- stage: Deploy
+  displayName: Deploy to AKS
+  dependsOn: Build
+  jobs:
+  - job: HelmDeploy
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+    - checkout: self
+
+    - task: AzureCLI@2
+      displayName: Get AKS Credentials
+      inputs:
+        azureSubscription: SmartOps-ServiceConnection
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          az aks get-credentials -g $(AKS_RG) -n $(AKS_NAME) --overwrite-existing
+          kubectl create namespace $(K8S_NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
+
+    - task: HelmInstaller@1
+      displayName: Install Helm
+      inputs:
+        helmVersionToInstall: latest
+
+    - script: |
+        helm upgrade --install smartops $(HELM_CHART_PATH) \
+          --namespace $(K8S_NAMESPACE) \
+          --set api.image.repository=$(ACR_LOGIN_SERVER)/$(IMAGE_REPO) \
+          --set api.image.tag=$(Build.BuildId)
+      displayName: Helm Deploy

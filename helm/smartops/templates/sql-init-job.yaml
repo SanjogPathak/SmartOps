@@ -1,0 +1,27 @@
+{{- if and .Values.sql.enabled .Values.sqlInitJob.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: smartops-sql-init
+  {{- if .Release.Namespace }}
+  namespace: {{ .Release.Namespace }}
+  {{- end }}
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: init
+          image: {{ .Values.sqlInitJob.image | quote }}
+          env:
+            - name: SA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: smartops-secrets
+                  key: SA_PASSWORD
+          command:
+            - /bin/sh
+            - -c
+            - |
+              /opt/mssql-tools/bin/sqlcmd -S {{ .Values.config.sqlHost }} -U {{ .Values.config.sqlUser }} -P "$SA_PASSWORD" -Q "IF DB_ID('{{ .Values.config.sqlDb }}') IS NULL CREATE DATABASE {{ .Values.config.sqlDb }};"
+{{- end }}

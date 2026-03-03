@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: smartops-api
+  {{- if .Release.Namespace }}
+  namespace: {{ .Release.Namespace }}
+  {{- end }}
+spec:
+  replicas: {{ .Values.api.replicaCount }}
+  selector:
+    matchLabels:
+      app: smartops-api
+  template:
+    metadata:
+      labels:
+        app: smartops-api
+    spec:
+      containers:
+        - name: api
+          image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
+          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.api.containerPort }}
+
+          envFrom:
+            - configMapRef:
+                name: smartops-config
+
+          env:
+            # Inject password into connection string at runtime
+            - name: SA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: smartops-secrets
+                  key: SA_PASSWORD
+
+            - name: ConnectionStrings__DefaultConnection
+              value: "Server={{ .Values.config.sqlHost }};Database={{ .Values.config.sqlDb }};User Id={{ .Values.config.sqlUser }};Password=$(SA_PASSWORD);TrustServerCertificate={{ .Values.config.trustServerCertificate }};"
+
+            - name: Jwt__Key
+              valueFrom:
+                secretKeyRef:
+                  name: smartops-secrets
+                  key: JWT_KEY
+
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: {{ .Values.api.containerPort }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: {{ .Values.api.containerPort }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
